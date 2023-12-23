@@ -67,7 +67,7 @@ def write_contexts_to_file_and_open(contexts):
     elif os.name == 'posix':
         subprocess.run(['open', contexts_output_file_path])
 
-def connect_to_local_chatgpt(prompt):
+def connect_to_local_chatgpt(prompt, cancel_flag=lambda: False):
     with open('config.yaml', 'r') as config_file:
         config = yaml.safe_load(config_file)
         server_config = config.get('server', {})
@@ -93,12 +93,18 @@ def connect_to_local_chatgpt(prompt):
         max_tokens=model_max_tokens,
         messages=[{"role": "user", "content": formatted_prompt}], stream=True
     )
-    for chunk in response:
-        if 'choices' in chunk and len(chunk['choices']) > 0 and 'delta' in chunk['choices'][0] and 'content' in chunk['choices'][0]['delta']:
-            chunk_message = chunk['choices'][0]['delta']['content']
-            yield chunk_message
+    try:
+        for chunk in response:
+            if cancel_flag():
+                print("CTLC break cancel_flag")
+                break
+            if 'choices' in chunk and len(chunk['choices']) > 0 and 'delta' in chunk['choices'][0] and 'content' in chunk['choices'][0]['delta']:
+                chunk_message = chunk['choices'][0]['delta']['content']
+                yield chunk_message
+    finally:
+        response.close()
 
-def ask_local_chatgpt(query, persist_directory=str(PERSIST_DIRECTORY), client_settings=CHROMA_SETTINGS):
+def ask_local_chatgpt(query, persist_directory=str(PERSIST_DIRECTORY), client_settings=CHROMA_SETTINGS, cancel_flag=lambda: False):
     my_cprint("Attempting to connect to server.", "white")
     print_cuda_memory()
 
@@ -190,7 +196,7 @@ def ask_local_chatgpt(query, persist_directory=str(PERSIST_DIRECTORY), client_se
     total_tokens = sum(len(tokenizer.encode(context)) for context in contexts)
     my_cprint(f"Total number of tokens in contexts: {total_tokens}", "white")
 
-    response_json = connect_to_local_chatgpt(augmented_query)
+    response_json = connect_to_local_chatgpt(augmented_query, cancel_flag)
 
     full_response = []
 

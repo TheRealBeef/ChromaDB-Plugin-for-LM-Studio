@@ -144,21 +144,34 @@ class DocQA_GUI(QWidget):
     def on_submit_button_clicked(self):
         self.submit_button.setDisabled(True)
         self.submit_button.setText("Processing...")
+
+
+    def on_submit_button_clicked(self):
+        if self.submit_button.text() == "Submit Questions":
+            print("submit clicked")
+            self.submit_button.setText("Processing, Click to Cancel")
+            self.start_streaming_process()
+        else:
+            self.submit_button.setText("Submit Questions")
+            print("cancel clicked")
+            self.stop_streaming_process()
+
+    def start_streaming_process(self):
         user_question = self.text_input.toPlainText()
         self.submit_button_thread = SubmitButtonThread(user_question, self)
         self.cumulative_response = ""
         self.submit_button_thread.responseSignal.connect(self.update_response)
         self.submit_button_thread.errorSignal.connect(self.enable_submit_button)
         self.submit_button_thread.start()
+        print("start streaming")
 
-        # timer to reset button
-        self.reset_timer = QTimer(self)
-        self.reset_timer.setSingleShot(True)
-        self.reset_timer.timeout.connect(self.enable_submit_button)
-        self.reset_timer.start(3000)  # 3 seconds
+    def stop_streaming_process(self):
+        if hasattr(self, 'submit_button_thread'):
+            self.submit_button_thread.request_cancellation()
+            print("request cancel")
+        self.enable_submit_button()
 
     def enable_submit_button(self):
-        self.submit_button.setDisabled(False)
         self.submit_button.setText("Submit Questions")
 
     def on_test_embeddings_changed(self):
